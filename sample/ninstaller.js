@@ -1,0 +1,1 @@
+../src/ninstaller.js
