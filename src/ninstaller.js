@@ -30,7 +30,7 @@
     return fBound;
   };
 
-  var nInstaller = {
+  global.nInstaller = {
     /**
      * 指定されたmanifestを読み込んでリソースのインストールを行う.
      * @param {string} manifestUrl manifest.jsonのURL.
@@ -57,7 +57,5 @@
       console.log(manifest);
     }
   };
-
-  global.nInstaller = nInstaller;
 
 })(window);
