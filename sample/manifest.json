@@ -1,5 +1,7 @@
 {
   "js": {
-    "path": ["foo.js"]
+    "path": [
+      {"path": "js/foo.js", "md5": "c7c76c804d180ad0f8e19acfb0edcaf9", "time": "2013/07/14 16:17:08 GMT+0900"}
+    ]
   }
 }
