@@ -1,1 +1,1 @@
-../src/ninstaller.js
+../build/ninstaller.js
