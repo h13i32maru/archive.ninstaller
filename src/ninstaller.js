@@ -145,12 +145,18 @@
       return resources;
     },
 
+    /**
+     * 現在のマニフェストを取得する.
+     * @param {function(manifest: Object)} callback 現在のマニフェスト取得完了時に実行されるコールバック関数.
+     * @private
+     */
     _getCurrentManifest: function(callback) {
       var db = openDatabase('ninstaller', "0.1", "nInstaller", 5 * 1000 * 1000);
+      db.transaction(transaction, error);
 
-      db.transaction(function(transaction){
-        transaction.executeSql('CREATE TABLE IF NOT EXISTS manifest (manifest TEXT)');
-        transaction.executeSql('SELECT * from manifest', null, function(transaction, result){
+      function transaction(tr) {
+        tr.executeSql('CREATE TABLE IF NOT EXISTS manifest (manifest TEXT)');
+        tr.executeSql('SELECT * from manifest', null, function(transaction, result){
           if (result.rows.length < 1) {
             callback(null);
           } else {
@@ -158,29 +164,12 @@
             callback(JSON.parse(row.manifest));
           }
         });
-      }, function(error){
-      });
-    },
+      }
 
-    updateResource: function(manifest) {
-      var db = openDatabase('ninstaller', "0.1", "nInstaller", 5 * 1000 * 1000);
-      db.transaction(function(tr){
+      function error(e) {
+        console.error(e);
+      }
 
-
-
-        tr.executeSql('CREATE TABLE IF NOT EXISTS js (id integer PRIMARY KEY AUTOINCREMENT, path TEXT, md5 TEXT, time TEXT)', []);
-        tr.executeSql('INSERT INTO js (path, md5, time) VALUES (?, ?, ?)', ['hoge', 'foo', 'bar']);
-
-        /*
-        tr.executeSql("SELECT * from js", [], function(){
-          console.log(arguments);
-        });
-        */
-      }, function(error) {
-        console.log(error);
-      }, function(){
-        console.log('success');
-      });
     }
   };
 
