@@ -125,6 +125,13 @@
       fetch(xhr);
     },
 
+    /**
+     * 現在のマニフェストと新しいマニフェストを比較して必要なリソース情報を取得する.
+     * @param {Object} newManifest 新しいマニフェスト.
+     * @param {Object} currentManifest 現在のマニフェスト.
+     * @returns {Object[]} リソース情報の配列.
+     * @private
+     */
     _getNewResource: function(newManifest, currentManifest) {
       var resources;
       if (!currentManifest) {
@@ -147,7 +154,7 @@
 
     /**
      * 現在のマニフェストを取得する.
-     * @param {function(manifest: Object)} callback 現在のマニフェスト取得完了時に実行されるコールバック関数.
+     * @param {function(currentManifest: Object)} callback 現在のマニフェスト取得完了時に実行されるコールバック関数.
      * @private
      */
     _getCurrentManifest: function(callback) {
