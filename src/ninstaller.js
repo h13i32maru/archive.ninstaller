@@ -50,33 +50,22 @@
   };
 
   global.nInstaller = {
+    _manifestUrl: null,
+    _newManifest: null,
+    _currentManifest: null,
+
     /**
      * 指定されたmanifestを読み込んでリソースのインストールを行う.
      * @param {string} manifestUrl manifest.jsonのURL.
      * @param {function} callback リソースのインストールが終わった後に実行されるコールバック関数.
      */
     init: function(manifestUrl, callback) {
-      var xhr = new XMLHttpRequest();
-
-      xhr.onload = bind(this._initSuccess, this, xhr, callback);
-      xhr.open('GET', manifestUrl, true);
-      xhr.send();
-    },
-
-    /**
-     * manifest読み込み完了時に実行される.
-     * @param {XMLHttpRequest} xhr
-     * @param {function} callback インストール完了時に実行されるコールバック関数.
-     * @private
-     * @callback
-     */
-    _initSuccess: function(xhr, callback) {
-      var manifestText = xhr.responseText;
-      var newManifest = JSON.parse(manifestText);
-
+      this._manifestUrl = manifestUrl;
       var seq = new this.CallbackSeq();
+
+      seq.addAsync(bind(this._fetchNewManifest, this));
       seq.addAsync(bind(this._loadCurrentManifest, this));
-      seq.addSync(bind(this._calcNewResource, this), newManifest);
+      seq.addSync(bind(this._calcNewResource, this));
       seq.addAsync(bind(this._fetchResources, this));
       seq.addAsync(bind(this._saveResources, this));
       seq.addSync(bind(this._complete, this), callback);
@@ -85,39 +74,78 @@
     },
 
     /**
-     * nInstallerの初期化呼び出し元に初期化が完了したことを通知する.
-     * @param {function} callback 初期化完了時に呼び出されるコールバック関数.
+     * サーバから新しいマニフェストを取得する.
+     * @param {function()} callback マニフェスト取得完了時に実行されるコールバック関数
      * @private
      */
-    _complete: function(callback) {
-      callback();
+    _fetchNewManifest: function(callback) {
+      var manifestUrl = this._manifestUrl;
+      var xhr = new XMLHttpRequest();
+
+      var _this = this;
+      xhr.onload = function(){
+        var manifestText = xhr.responseText;
+        _this._newManifest = JSON.parse(manifestText);
+        callback();
+      };
+
+      xhr.open('GET', manifestUrl, true);
+      xhr.send();
     },
 
     /**
-     * リソースをDBに保存する.
-     * @param {Object[]} resources 保存するリソース.
-     * @param {function} callback 保存完了時に実行されるコールバック関数.
+     * 現在のマニフェストを取得する.
+     * @param {function()} callback 現在のマニフェスト取得完了時に実行されるコールバック関数.
      * @private
      */
-    _saveResources: function(resources, callback) {
+    _loadCurrentManifest: function(callback) {
       var db = openDatabase('ninstaller', "0.1", "nInstaller", 5 * 1000 * 1000);
-      db.transaction(transaction, error, success);
+      db.transaction(transaction, error);
 
+      var _this = this;
       function transaction(tr) {
-        tr.executeSql('CREATE TABLE IF NOT EXISTS js (path TEXT PRIMARY KEY, md5 TEXT, time TEXT, content TEXT)', []);
-        for (var i = 0; i < resources.length; i++) {
-          var res = resources[i];
-          tr.executeSql('INSERT OR REPLACE INTO js (path, md5, time, content) VALUES (?, ?, ?, ?)', [res.path, res.md5, res.time, res.content]);
-        }
+        tr.executeSql('CREATE TABLE IF NOT EXISTS manifest (manifest TEXT)');
+        tr.executeSql('SELECT * from manifest', null, function(transaction, result){
+          if (result.rows.length < 1) {
+            callback();
+          } else {
+            var row =  result.rows.item(0);
+            _this._currentManifest = JSON.parse(row.manifest);
+            callback();
+          }
+        });
       }
 
       function error(e) {
-        console.log(e);
+        console.error(e);
+      }
+    },
+
+    /**
+     * 現在のマニフェストと新しいマニフェストを比較して必要なリソース情報を取得する.
+     * @returns {Object[]} リソース情報の配列.
+     * @private
+     */
+    _calcNewResource: function() {
+      var newManifest = this._newManifest;
+      var currentManifest = this._currentManifest;
+      var resources;
+      if (!currentManifest) {
+        resources = [].concat(newManifest.js.resources);
+      } else {
+        resources = [];
+        var currentResourcesMap = arrayToMap(currentManifest.js.resources, 'path');
+        var newResources = newManifest.js.resouces;
+        for (var i = 0; i < newResources.length; i++) {
+          var newResource = newResources[i];
+          var currentResource = currentResourcesMap[newResource.path];
+          if (newResource.md5 !== currentResource.md5) {
+            resources.push(newResource);
+          }
+        }
       }
 
-      function success() {
-        callback();
-      }
+      return resources;
     },
 
     /**
@@ -151,57 +179,39 @@
     },
 
     /**
-     * 現在のマニフェストと新しいマニフェストを比較して必要なリソース情報を取得する.
-     * @param {Object} newManifest 新しいマニフェスト.
-     * @param {Object} currentManifest 現在のマニフェスト.
-     * @returns {Object[]} リソース情報の配列.
+     * リソースをDBに保存する.
+     * @param {Object[]} resources 保存するリソース.
+     * @param {function} callback 保存完了時に実行されるコールバック関数.
      * @private
      */
-    _calcNewResource: function(newManifest, currentManifest) {
-      var resources;
-      if (!currentManifest) {
-        resources = [].concat(newManifest.js.resources);
-      } else {
-        resources = [];
-        var currentResourcesMap = arrayToMap(currentManifest.js.resources, 'path');
-        var newResources = newManifest.js.resouces;
-        for (var i = 0; i < newResources.length; i++) {
-          var newResource = newResources[i];
-          var currentResource = currentResourcesMap[newResource.path];
-          if (newResource.md5 !== currentResource.md5) {
-            resources.push(newResource);
-          }
+    _saveResources: function(resources, callback) {
+      var db = openDatabase('ninstaller', "0.1", "nInstaller", 5 * 1000 * 1000);
+      db.transaction(transaction, error, success);
+
+      function transaction(tr) {
+        tr.executeSql('CREATE TABLE IF NOT EXISTS js (path TEXT PRIMARY KEY, md5 TEXT, time TEXT, content TEXT)', []);
+        for (var i = 0; i < resources.length; i++) {
+          var res = resources[i];
+          tr.executeSql('INSERT OR REPLACE INTO js (path, md5, time, content) VALUES (?, ?, ?, ?)', [res.path, res.md5, res.time, res.content]);
         }
       }
 
-      return resources;
+      function error(e) {
+        console.log(e);
+      }
+
+      function success() {
+        callback();
+      }
     },
 
     /**
-     * 現在のマニフェストを取得する.
-     * @param {function(currentManifest: Object)} callback 現在のマニフェスト取得完了時に実行されるコールバック関数.
+     * nInstallerの初期化呼び出し元に初期化が完了したことを通知する.
+     * @param {function} callback 初期化完了時に呼び出されるコールバック関数.
      * @private
      */
-    _loadCurrentManifest: function(callback) {
-      var db = openDatabase('ninstaller', "0.1", "nInstaller", 5 * 1000 * 1000);
-      db.transaction(transaction, error);
-
-      function transaction(tr) {
-        tr.executeSql('CREATE TABLE IF NOT EXISTS manifest (manifest TEXT)');
-        tr.executeSql('SELECT * from manifest', null, function(transaction, result){
-          if (result.rows.length < 1) {
-            callback(null);
-          } else {
-            var row =  result.rows.item(0);
-            callback(JSON.parse(row.manifest));
-          }
-        });
-      }
-
-      function error(e) {
-        console.error(e);
-      }
-
+    _complete: function(callback) {
+      callback();
     }
   };
 
