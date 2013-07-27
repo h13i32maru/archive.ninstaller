@@ -75,22 +75,22 @@
       var newManifest = JSON.parse(manifestText);
 
       var seq = new this.CallbackSeq();
-      seq.addAsync(bind(this._getCurrentManifest, this));
-      seq.addSync(bind(this._getNewResource, this), newManifest);
+      seq.addAsync(bind(this._loadCurrentManifest, this));
+      seq.addSync(bind(this._calcNewResource, this), newManifest);
       seq.addAsync(bind(this._fetchResources, this));
       seq.addAsync(bind(this._saveResources, this));
-      seq.addAsync(bind(this._completeInit, this));
+      seq.addSync(bind(this._complete, this), callback);
 
       seq.start();
-
     },
 
     /**
      * nInstallerの初期化呼び出し元に初期化が完了したことを通知する.
+     * @param {function} callback 初期化完了時に呼び出されるコールバック関数.
      * @private
      */
-    _completeInit: function() {
-      console.log('complete!!!');
+    _complete: function(callback) {
+      callback();
     },
 
     /**
@@ -157,7 +157,7 @@
      * @returns {Object[]} リソース情報の配列.
      * @private
      */
-    _getNewResource: function(newManifest, currentManifest) {
+    _calcNewResource: function(newManifest, currentManifest) {
       var resources;
       if (!currentManifest) {
         resources = [].concat(newManifest.js.resources);
@@ -182,7 +182,7 @@
      * @param {function(currentManifest: Object)} callback 現在のマニフェスト取得完了時に実行されるコールバック関数.
      * @private
      */
-    _getCurrentManifest: function(callback) {
+    _loadCurrentManifest: function(callback) {
       var db = openDatabase('ninstaller', "0.1", "nInstaller", 5 * 1000 * 1000);
       db.transaction(transaction, error);
 
