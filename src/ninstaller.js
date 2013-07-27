@@ -100,9 +100,16 @@
       }
     },
 
+    /**
+     * リソースをサーバから取得する.
+     * @param {Object[]} resources リソース情報の配列.
+     * @param {function(resources: Object[])} callback リソース取得完了時に実行されるコールバック関数.
+     * @private
+     */
     _fetchResources: function(resources, callback) {
       var index = 0;
       var xhr = new XMLHttpRequest();
+      fetch();
 
       //TODO: 並列読み込みにする
       function fetch(){
@@ -121,8 +128,6 @@
         xhr.open('GET', res.path, true);
         xhr.send();
       }
-
-      fetch(xhr);
     },
 
     /**
