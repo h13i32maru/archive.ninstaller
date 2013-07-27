@@ -64,11 +64,65 @@
       var manifestText = xhr.responseText;
       var newManifest = JSON.parse(manifestText);
 
-      this._getCurrentManifest(bind(function(currentManifest) {
-        var resources = this._getNewResource(newManifest, currentManifest);
-        this._fetchResources(resources, bind(this._saveResouces, this));
-      }, this));
-      //this.updateResource(manifest);
+      var seq = new this.CallbackSeq();
+      seq.addAsync(bind(this._getCurrentManifest, this));
+      seq.addSync(bind(this._getNewResource, this), newManifest);
+      seq.addAsync(bind(this._fetchResources, this));
+      seq.addAsync(bind(this._saveResources, this));
+      seq.addAsync(bind(this._completeInit, this));
+
+      seq.start();
+
+    },
+
+    _completeInit: function() {
+      console.log('complete!!!');
+    },
+
+    _saveResources: function(resources, callback) {
+      var db = openDatabase('ninstaller', "0.1", "nInstaller", 5 * 1000 * 1000);
+      db.transaction(transaction, error, success);
+
+      function transaction(tr) {
+        tr.executeSql('CREATE TABLE IF NOT EXISTS js (path TEXT PRIMARY KEY, md5 TEXT, time TEXT, content TEXT)', []);
+        for (var i = 0; i < resources.length; i++) {
+          var res = resources[i];
+          tr.executeSql('INSERT OR REPLACE INTO js (path, md5, time, content) VALUES (?, ?, ?, ?)', [res.path, res.md5, res.time, res.content]);
+        }
+      }
+
+      function error(e) {
+        console.log(e);
+      }
+
+      function success() {
+        callback();
+      }
+    },
+
+    _fetchResources: function(resources, callback) {
+      var index = 0;
+      var xhr = new XMLHttpRequest();
+
+      //TODO: 並列読み込みにする
+      function fetch(){
+        if (resources.length === index) {
+          callback(resources);
+          return;
+        }
+
+        var res = resources[index];
+        xhr.onload = function(){
+          var content = xhr.responseText;
+          res.content = content;
+          index++;
+          fetch();
+        };
+        xhr.open('GET', res.path, true);
+        xhr.send();
+      }
+
+      fetch(xhr);
     },
 
     _getNewResource: function(newManifest, currentManifest) {
@@ -93,6 +147,7 @@
 
     _getCurrentManifest: function(callback) {
       var db = openDatabase('ninstaller', "0.1", "nInstaller", 5 * 1000 * 1000);
+
       db.transaction(function(transaction){
         transaction.executeSql('CREATE TABLE IF NOT EXISTS manifest (manifest TEXT)');
         transaction.executeSql('SELECT * from manifest', null, function(transaction, result){
