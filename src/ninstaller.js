@@ -30,6 +30,16 @@
     return fBound;
   };
 
+  /**
+   * オブジェクトの配列を指定されたキーを元にマップに変換する.
+   * @param {Object[]} array 変換元の配列.
+   * @param {string} key マップに変換するときに使用するオブジェクト内のキー名.
+   * @returns {Object} 変換されたマップ.
+   * @example
+   * var array = [{foo: 'aaa'}, {foo: 'bbb'}, {foo: 'ccc'}];
+   * var map = arrayToMap(array, 'foo');
+   * console.log(map); //{aaa: {foo: 'aaa'}, bbb: {foo: 'bbb'}, ccc: {foo: 'ccc'}}
+   */
   var arrayToMap = function(array, key) {
     var result = {};
     for (var i = 0; i < array.length; i++) {
@@ -75,10 +85,20 @@
 
     },
 
+    /**
+     * nInstallerの初期化呼び出し元に初期化が完了したことを通知する.
+     * @private
+     */
     _completeInit: function() {
       console.log('complete!!!');
     },
 
+    /**
+     * リソースをDBに保存する.
+     * @param {Object[]} resources 保存するリソース.
+     * @param {function} callback 保存完了時に実行されるコールバック関数.
+     * @private
+     */
     _saveResources: function(resources, callback) {
       var db = openDatabase('ninstaller', "0.1", "nInstaller", 5 * 1000 * 1000);
       db.transaction(transaction, error, success);
